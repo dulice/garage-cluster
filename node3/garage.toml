@@ -1,0 +1,27 @@
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+metadata_auto_snapshot_interval = "6h"
+
+replication_factor = 3
+consistency_mode = "consistent"
+bootstrap_peers = []
+
+rpc_bind_addr = "0.0.0.0:3901"
+rpc_public_addr = "node3:3901" # Required
+rpc_secret = "88b9392450de07c90b3b488d4d97caf9afb52f2a132e8b340dc0af5dae43e23e"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "0.0.0.0:3900"
+root_domain = ".s3.anurag.com.mm"
+
+[s3_web] # Optional, if you want to expose bucket as web
+bind_addr = "0.0.0.0:3902"
+root_domain = ".web.anurag.com.mm"
+index = "index.html"
+
+[admin] # Required
+api_bind_addr = "0.0.0.0:3903"
+admin_token = "BiH69lKKBuAC2dAwwQvtzu24UNQrLGXrnlOiqAE1Qq4="
+metrics_token = "8+hVIb/lh+DdJcIG7UKNX4f5pkqn5iatBeUGffyi1AA="

@@ -1,0 +1,52 @@
+services:
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: haproxy
+    restart: unless-stopped
+    ports:
+      - "3900:3900"
+      - "3902:3902"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - node1
+
+  node1:
+    image: dxflrs/garage:v2.0.0
+    container_name: node1
+    restart: unless-stopped
+    ports:
+      - "3901:3901"
+      - "3903:3903"
+    volumes:
+      - ./node1/garage.toml:/etc/garage.toml
+      - ./node1/data:/var/lib/garage/data
+      - ./node1/meta:/var/lib/garage/meta
+
+  node2:
+    image: dxflrs/garage:v2.0.0
+    container_name: node2
+    restart: unless-stopped
+    ports:
+      - "3910:3900"
+      - "3911:3901"
+      - "3912:3902"
+      - "3913:3903"
+    volumes:
+      - ./node2/garage.toml:/etc/garage.toml
+      - ./node2/data:/var/lib/garage/data
+      - ./node2/meta:/var/lib/garage/meta
+
+  node3:
+    image: dxflrs/garage:v2.0.0
+    container_name: node3
+    restart: unless-stopped
+    ports:
+      - "3920:3900"
+      - "3921:3901"
+      - "3922:3902"
+      - "3923:3903"
+    volumes:
+      - ./node3/garage.toml:/etc/garage.toml
+      - ./node3/data:/var/lib/garage/data
+      - ./node3/meta:/var/lib/garage/meta
