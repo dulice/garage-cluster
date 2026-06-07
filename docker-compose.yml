@@ -8,8 +8,6 @@ services:
       - "3902:3902"
     volumes:
       - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-    depends_on:
-      - node1
 
   node1:
     image: dxflrs/garage:v2.0.0
@@ -50,3 +48,158 @@ services:
       - ./node3/garage.toml:/etc/garage.toml
       - ./node3/data:/var/lib/garage/data
       - ./node3/meta:/var/lib/garage/meta
+
+  node4:
+    image: dxflrs/garage:v2.0.0
+    container_name: node4
+    restart: unless-stopped
+    ports:
+      - "3930:3900"
+      - "3931:3901"
+      - "3932:3902"
+      - "3933:3903"
+    volumes:
+      - ./node4/garage.toml:/etc/garage.toml
+      - ./node4/data:/var/lib/garage/data
+      - ./node4/meta:/var/lib/garage/meta
+
+  node5:
+    image: dxflrs/garage:v2.0.0
+    container_name: node5
+    restart: unless-stopped
+    ports:
+      - "3940:3900"
+      - "3941:3901"
+      - "3942:3902"
+      - "3943:3903"
+    volumes:
+      - ./node5/garage.toml:/etc/garage.toml
+      - ./node5/data:/var/lib/garage/data
+      - ./node5/meta:/var/lib/garage/meta
+
+  node6:
+    image: dxflrs/garage:v2.0.0
+    container_name: node6
+    restart: unless-stopped
+    ports:
+      - "3950:3900"
+      - "3951:3901"
+      - "3952:3902"
+      - "3953:3903"
+    volumes:
+      - ./node6/garage.toml:/etc/garage.toml
+      - ./node6/data:/var/lib/garage/data
+      - ./node6/meta:/var/lib/garage/meta
+
+  webui:
+    image: khairul169/garage-webui:1.1.0
+    container_name: garage-webui
+    restart: unless-stopped
+    expose:
+      - "3909"
+    environment:
+      API_BASE_URL: "http://node1:3903"
+      S3_ENDPOINT_URL: "http://node1:3900"
+      API_ADMIN_KEY: "BiH69lKKBuAC2dAwwQvtzu24UNQrLGXrnlOiqAE1Qq4="
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2-proxy
+    restart: unless-stopped
+    ports:
+      - "3909:3909"
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:3909"
+      OAUTH2_PROXY_PROVIDER: "oidc"
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "http://localhost:8080/realms/garage"
+      OAUTH2_PROXY_LOGIN_URL: "http://localhost:8080/realms/garage/protocol/openid-connect/auth"
+      OAUTH2_PROXY_REDEEM_URL: "http://host.docker.internal:8080/realms/garage/protocol/openid-connect/token"
+      OAUTH2_PROXY_OIDC_JWKS_URL: "http://host.docker.internal:8080/realms/garage/protocol/openid-connect/certs"
+      OAUTH2_PROXY_CLIENT_ID: "${KEYCLOAK_CLIENT_ID:-garage-webui}"
+      OAUTH2_PROXY_CLIENT_SECRET: "${KEYCLOAK_CLIENT_SECRET}"
+      OAUTH2_PROXY_REDIRECT_URL: "${OAUTH2_REDIRECT_URL:-http://localhost:3909/oauth2/callback}"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "${OAUTH2_EMAIL_DOMAINS:-*}"
+      OAUTH2_PROXY_COOKIE_SECRET: "${OAUTH2_COOKIE_SECRET}"
+      OAUTH2_PROXY_COOKIE_SECURE: "${OAUTH2_COOKIE_SECURE:-false}"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "${OAUTH2_SKIP_PROVIDER_BUTTON:-false}"
+    command:
+      - --upstream=http://webui:3909
+    depends_on:
+      - webui
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    depends_on:
+      - node1
+      - node2
+      - node3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    depends_on:
+      - prometheus
+
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: keycloak-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: keycloak
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    command: start-dev
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  keycloak_db_data:
